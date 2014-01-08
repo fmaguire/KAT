@@ -28,12 +28,13 @@
 #include <seqan/seq_io.h>
 
 #include <jellyfish/hash.hpp>
-#include <jellyfish/counter.hpp>
 #include <jellyfish/thread_exec.hpp>
 #include <jellyfish/jellyfish_helper.hpp>
 
 #include <matrix/matrix_metadata_extractor.hpp>
 #include <matrix/threaded_sparse_matrix.hpp>
+
+#include <seq_utils.hpp>
 
 #include "sect_args.hpp"
 
@@ -472,32 +473,15 @@ namespace kat
             // Add length
             (*lengths)[index] = seqLength;
 
-            // Calc GC%
-            uint64_t gs = 0;
-            uint64_t cs = 0;
-            uint64_t ns = 0;
-
-            for(uint64_t i = 0; i < seqLength; i++)
-            {
-                char c = seq[i];
-
-                if (c == 'G' || c == 'g')
-                    gs++;
-                else if (c == 'C' || c == 'c')
-                    cs++;
-                else if (c == 'N' || c == 'n')
-                    ns++;
-            }
-
-            float gc_perc = ((float)(gs + cs)) / ((float)(seqLength - ns));
-            (*gcs)[index] = gc_perc;
+            // Calculate GC%
+            (*gcs)[index] = kat::calcGCPercentage(seq);
 
             float log_cvg = args->cvg_logscale ? log10(mean_cvg) : mean_cvg;
 
             // Assume log_cvg 5 is max value
             float compressed_cvg = args->cvg_logscale ? log_cvg * (args->cvg_bins / 5.0) : mean_cvg * 0.1;
 
-            uint16_t x = gc_perc * args->gc_bins;  // Convert float to 1.dp
+            uint16_t x = (*gcs)[index] * args->gc_bins;  // Convert float to 1.dp
             uint16_t y = compressed_cvg >= args->cvg_bins ? args->cvg_bins - 1 : compressed_cvg;      // Simply cap the y value
 
             // Add bases to matrix

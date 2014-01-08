@@ -62,6 +62,10 @@ int main(int argc, char *argv[])
     {
         kat::histStart(args.getModeArgC(), args.getModeArgV());
     }
+    else if (mode.compare(kat::KAT_REF_ID) == 0)
+    {
+        kat::refStart(args.getModeArgC(), args.getModeArgV());
+    }
     else if (mode.compare(kat::KAT_PLOT_ID) == 0)
     {
         kat::plotStart(args.getModeArgC(), args.getModeArgV());

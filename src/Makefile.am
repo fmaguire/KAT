@@ -19,6 +19,7 @@ kat_SOURCES = \
                 inc/matrix/matrix_metadata_extractor.cc \
                 inc/str_utils.hpp \
                 inc/file_utils.hpp \
+		inc/seq_utils.hpp \
                 inc/common_args.hpp \
                 sect/sect_main.cc \
 		sect/sect.hpp \
@@ -36,6 +37,17 @@ kat_SOURCES = \
 		hist/histogram.hpp \
 		hist/hist_args.hpp \
 		hist/hist_main.hpp \
+		filter/filter_main.cc \
+		filter/filter_args.hpp \
+		filter/filter_main.hpp \
+		filter/kmer/kmer_filter_main.cc \
+		filter/kmer/kmer_filter.hpp \
+		filter/kmer/kmer_filter_args.hpp \
+		filter/kmer/kmer_filter_main.hpp \
+        filter/seq/seq_filter_main.cc \
+		filter/seq/seq_filter.hpp \
+		filter/seq/seq_filter_args.hpp \
+		filter/seq/seq_filter_main.hpp \
                 plot/plot_main.cc \
 		plot/plot_args.hpp \
 		plot/plot_main.hpp \

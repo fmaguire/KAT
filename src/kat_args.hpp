@@ -35,6 +35,7 @@ namespace kat
     const string KAT_COMP_ID  = "comp";
     const string KAT_GCP_ID   = "gcp";
     const string KAT_HIST_ID  = "hist";
+    const string KAT_REF_ID  = "ref";
     const string KAT_PLOT_ID  = "plot";
 
     const uint16_t MIN_ARGS = 0;
@@ -143,6 +144,7 @@ namespace kat
                     mode_str.compare(KAT_COMP_ID) == 0 ||
                     mode_str.compare(KAT_GCP_ID) == 0 ||
                     mode_str.compare(KAT_HIST_ID) == 0 ||
+                    mode_str.compare(KAT_REF_ID) == 0 ||
                     mode_str.compare(KAT_PLOT_ID) == 0) ?
                         true : false;
         }

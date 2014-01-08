@@ -29,6 +29,8 @@
 #include <matrix/matrix_metadata_extractor.hpp>
 #include <matrix/threaded_sparse_matrix.hpp>
 
+#include <seq_utils.hpp>
+
 #include "gcp_args.hpp"
 
 using std::ostream;
@@ -111,15 +113,7 @@ namespace kat
                     string kmer = it.get_dna_str();
                     uint64_t kmer_count = it.get_val();
 
-                    uint16_t g_or_c = 0;
-
-                    for(uint16_t i = 0; i < kmer.length(); i++)
-                    {
-                        char c = kmer[i];
-
-                        if (c == 'G' || c == 'g' || c == 'C' || c == 'c')
-                            g_or_c++;
-                    }
+                    uint32_t g_or_c = kat::gcCount(kmer);
 
                     // Apply scaling factor
                     uint64_t cvg_pos = kmer_count == 0 ? 0 : ceil((double)kmer_count * args->cvg_scale);

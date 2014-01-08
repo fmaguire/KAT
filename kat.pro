@@ -39,7 +39,20 @@ HEADERS += \
     src/hist/hist_args.hpp \
     src/plot/spectra-mx/spectra_mx_plot_main.hpp \
     src/plot/spectra-mx/spectra_mx_plot_args.hpp \
-    src/inc/file_utils.hpp
+    src/inc/file_utils.hpp \
+    src/ref/ref_main.hpp \
+    src/ref/ref_args.hpp \
+    src/inc/seq_utils.hpp \
+    src/ref/seq_filter.hpp \
+    src/filter/filter_main.hpp \
+    src/filter/filter_args.hpp \
+    src/filter/common_filter_args.hpp \
+    src/filter/kmer/kmer_filter_main.hpp \
+    src/filter/kmer/kmer_filter_args.hpp \
+    src/filter/kmer/kmer_filter.hpp \
+    src/filter/seq/seq_filter_main.hpp \
+    src/filter/seq/seq_filter_args.hpp \
+    src/filter/seq/seq_filter.hpp
 
 SOURCES += \
     src/comp/comp_main.cc \
@@ -59,7 +72,12 @@ SOURCES += \
     src/plot/spectra-hist/spectra_hist_plot_main.cc \
     src/hist/hist_main.cc \
     src/plot/spectra-mx/spectra_mx_plot_main.cc \
-    tests/check_sect.cc
+    tests/check_sect.cc \
+    src/ref/ref_main.cc \
+    src/inc/seq_utils.cc \
+    src/filter/filter_main.cc \
+    src/filter/kmer/kmer_filter_main.cc \
+    src/filter/seq/seq_filter_main.cc
 
 OTHER_FILES += \
     src/Makefile.am \

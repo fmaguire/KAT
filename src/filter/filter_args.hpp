@@ -25,7 +25,7 @@
 
 #include <common_args.hpp>
 
-#include "plot_main.hpp"
+#include "filter_main.hpp"
 
 using std::string;
 using std::cerr;
@@ -34,15 +34,12 @@ using std::endl;
 
 namespace kat
 {
-    const string KAT_PLOT_DENSITY_ID        = "density";
-    const string KAT_PLOT_PROFILE_ID        = "profile";
-    const string KAT_PLOT_SPECTRA_CN_ID     = "spectra-cn";
-    const string KAT_PLOT_SPECTRA_HIST_ID   = "spectra-hist";
-    const string KAT_PLOT_SPECTRA_MX_ID   = "spectra-mx";
+    const string KAT_FILTER_KMER_ID        = "kmer";
+    const string KAT_FILTER_SEQ_ID         = "seq";
 
     const uint16_t MIN_ARGS = 0;
 
-    class PlotArgs : public BaseArgs
+    class FilterArgs : public BaseArgs
     {
     private:
         string  mode_arg;
@@ -54,23 +51,13 @@ namespace kat
         // ***********************************************
         // These methods override BaseArgs virtual methods
 
-        const string usage() const               { return "Usage: kat plot <mode>"; }
-        const string shortDescription() const    { return "Create K-mer Plots"; }
+        const string usage() const               { return "Usage: kat filter <mode>"; }
+        const string shortDescription() const    { return "Filtering tools"; }
         const string longDescription() const
         {
-            return  "First argument should be the plot mode you wish to use:\n" \
-                    "  - density:         Creates a density plot from a matrix created with the \"comp\" tool.  Typically this is\n" \
-                    "                     used to compare two K-mer hashes produced by different NGS reads.\n" \
-                    "  - profile:         Creates a K-mer coverage plot for a single sequence.  Takes in fasta coverage output\n" \
-                    "                     coverage from the \"sect\" tool\n" \
-                    "  - spectra-cn:      Creates a stacked histogram using a matrix created with the \"comp\" tool.  Typically\n" \
-                    "                     this is used to compare a jellyfish hash produced from a read set to a jellyfish hash\n" \
-                    "                     produced from an assembly. The plot shows the amount of distinct K-mers absent, as well\n" \
-                    "                     as the copy number variation present within the assembly.\n" \
-                    "  - spectra-hist:    Creates a K-mer spectra plot for a set of K-mer histograms produced either by jellyfish-\n" \
-                    "                     histo or kat-histo.\n" \
-                    "  - spectra-mx:      Creates a K-mer spectra plot for a set of K-mer histograms that are derived from\n" \
-                    "                     selected rows or columns in a matrix produced by the \"comp\".";
+            return  "First argument should be the filter mode you wish to use:\n" \
+                    "  - kmer:    Filters a jellyfish kmer hash based on GC and kmer count limits\n" \
+                    "  - seq:     Filters sequences from a file based on presence of a kmer in the sequence\n";
         }
 
         const string optionsDescription() const    { return ""; }
@@ -90,11 +77,11 @@ namespace kat
     public:
 
         // Default constructor
-        PlotArgs() : BaseArgs(MIN_ARGS)
+        FilterArgs() : BaseArgs(MIN_ARGS)
         {}
 
         // Constructor that parses command line options
-        PlotArgs(int argc, char* argv[]) : BaseArgs(MIN_ARGS)
+        FilterArgs(int argc, char* argv[]) : BaseArgs(MIN_ARGS)
         {
             customParse(argc, argv);
         }
@@ -113,11 +100,8 @@ namespace kat
 
         bool validMode(string mode_str)
         {
-            return mode_str.compare(KAT_PLOT_DENSITY_ID) == 0 ||
-                   mode_str.compare(KAT_PLOT_PROFILE_ID) == 0 ||
-                   mode_str.compare(KAT_PLOT_SPECTRA_CN_ID) == 0 ||
-                   mode_str.compare(KAT_PLOT_SPECTRA_HIST_ID) == 0 ||
-                   mode_str.compare(KAT_PLOT_SPECTRA_MX_ID) == 0;
+            return mode_str.compare(KAT_FILTER_KMER_ID) == 0 ||
+                   mode_str.compare(KAT_FILTER_SEQ_ID) == 0;
         }
 
 
