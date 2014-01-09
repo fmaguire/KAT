@@ -27,6 +27,7 @@
 #include "comp/comp_main.hpp"
 #include "gcp/gcp_main.hpp"
 #include "hist/hist_main.hpp"
+#include "filter/filter_main.hpp"
 #include "plot/plot_main.hpp"
 
 using std::string;
@@ -64,7 +65,7 @@ int main(int argc, char *argv[])
     }
     else if (mode.compare(kat::KAT_REF_ID) == 0)
     {
-        kat::refStart(args.getModeArgC(), args.getModeArgV());
+        kat::filterStart(args.getModeArgC(), args.getModeArgV());
     }
     else if (mode.compare(kat::KAT_PLOT_ID) == 0)
     {

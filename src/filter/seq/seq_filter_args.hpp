@@ -35,19 +35,13 @@ using std::ostringstream;
 
 namespace kat
 {
-    const uint64_t  DEFAULT_REF_LOW_COUNT    = 0;
-    const uint64_t  DEFAULT_REF_HIGH_COUNT   = 10000;
-    const uint16_t  DEFAULT_REF_LOW_GC       = 0;
-    const uint16_t  DEFAULT_REF_HIGH_GC      = 10000;
-    const uint16_t  DEFAULT_REF_THREADS      = 1;
-    const bool      DEFAULT_REF_DISCARD      = false;
-    const bool      DEFAULT_REF_GC_PERC      = false;
-    const char*     DEFAULT_REF_OUTPUT       = "kat.ref";
-    const char*     DEFAULT_REF_SEQ_FILE_1   = "";
-    const char*     DEFAULT_REF_SEQ_FILE_2   = "";
+    const bool      DEFAULT_FILTER_SEQ_DISCARD       = false;
+    const char*     DEFAULT_FILTER_SEQ_OUTPUT_PREFIX = "kat.filter.seq";
+    const char*     DEFAULT_FILTER_SEQ_SEQ_FILE_1    = "";
+    const char*     DEFAULT_FILTER_SEQ_SEQ_FILE_2    = "";
 
 
-    const uint16_t  REF_MIN_ARGS = 1;
+    const uint16_t  FILTER_SEQ_MIN_ARGS = 2;
 
 
     class SeqFilterArgs : public BaseArgs
@@ -59,12 +53,12 @@ namespace kat
 
         const string usage() const
         {
-            return "Usage: kat ref [options] [-i <seq_file1> -j <seq_file2>] <jellyfish_hash>";
+            return "Usage: kat filter seq [options] <jellyfish_hash> <seq_file1> [<seq_file2>]";
         }
 
         const string shortDescription() const
         {
-            return "Filters sequences based on gc and kmer coverage limits.";
+            return "Filters sequences based on whether a kmer is present in that sequence.";
         }
 
         const string longDescription() const
@@ -82,16 +76,10 @@ namespace kat
         {
             ostringstream help_str;
 
-            help_str << " -o, --output_prefix=path    Output prefix for the filtered file and hash. (\"" << DEFAULT_REF_OUTPUT << "\")" << endl
-                     << " -i, --seq_file_1=path       The input sequence file to filter.  If you are using paired data this option specifies the first file." << endl
-                     << " -j, --seq_file_2=path       The second input sequence file to filter if you are using paired data." << endl
-                     << " -l, --low_count=uint64      Low kmer count limit (" << DEFAULT_REF_LOW_COUNT << ")" << endl
-                     << " -h, --high_count=uint64     High kmer count limit (" << DEFAULT_REF_HIGH_COUNT << ")" << endl
-                     << " -x, --low_gc=uint16         Low GC count limit. (\"" << DEFAULT_REF_LOW_GC << "\")" << endl
-                     << " -y, --high_gc=uint16        High GC count limit. (\"" << DEFAULT_REF_HIGH_GC << "\")" << endl
-                     << " -d, --discard_selection     Discard kmers and sequences equal to or within the limits rather than outside the limits." << endl
-                     << " -g, --gc_perc               GC limits are defined as percentages, not raw counts." << endl
-                     << " -t, --threads=uint16        Number of threads (" << DEFAULT_REF_THREADS << ")";
+            help_str << " -o, --output_prefix=path    Output prefix for the filtered file.  If paired files are input, the " \
+                     << "                             suffix will start with \"_R?.\" (\"" << DEFAULT_FILTER_SEQ_OUTPUT_PREFIX << "\")" << endl
+                     << " -d, --discard_selection     Discard sequences that contain kmers in the hash.  By default, this " \
+                     << "                             tool will discard sequences that do not have kmers found in the hash." << endl;
 
             return help_str.str();
         }
@@ -100,21 +88,13 @@ namespace kat
         {
             static struct option long_options_array[] =
             {
-                {"output",              required_argument,  0, 'o'},
-                {"seq_file_1",          required_argument,  0, 'i'},
-                {"seq_file_2",          required_argument,  0, 'j'},
-                {"low_count",           required_argument,  0, 'l'},
-                {"high_count",          required_argument,  0, 'h'},
-                {"low_gc",              required_argument,  0, 'x'},
-                {"high_gc",             required_argument,  0, 'y'},
-                {"discard_selection",   no_argument,        0, 'd'},
-                {"gc_perc",             no_argument,        0, 'g'},
-                {"threads",             required_argument,  0, 't'}
+                {"output_prefix",       required_argument,  0, 'o'},
+                {"discard_selection",   no_argument,        0, 'd'}
             };
 
             vector<option>* long_options = new vector<option>();
 
-            for(uint8_t i = 0; i < 10; i++)
+            for(uint8_t i = 0; i < 2; i++)
             {
                 long_options->push_back(long_options_array[i]);
             }
@@ -124,7 +104,7 @@ namespace kat
 
         string shortOptions()
         {
-            return "o:i:j:l:h:x:y:dgt:";
+            return "o:d:";
         }
 
         void setOption(int c, string& option_arg) {
@@ -132,56 +112,29 @@ namespace kat
             switch(c)
             {
             case 'o':
-                output = string(optarg);
-                break;
-            case 'i':
-                seq_file_1 = string(optarg);
-                break;
-            case 'j':
-                seq_file_2 = string(optarg);
-                break;
-            case 'l':
-                low_count = strToInt64(optarg);
-                break;
-            case 'h':
-                high_count = strToInt64(optarg);
-                break;
-            case 'x':
-                low_gc = strToInt16(optarg);
-                break;
-            case 'y':
-                high_gc = strToInt16(optarg);
+                output_prefix = string(optarg);
                 break;
             case 'd':
                 discard = true;
                 break;
-            case 'g':
-                gc_perc = true;
-                break;
-            case 't':
-                threads = strToInt16(optarg);
-                break;
-
             }
         }
 
         void processRemainingArgs(const vector<string>& remaining_args)
         {
             jellyfish_hash = remaining_args[0];
+            seq_file_1 = remaining_args[1];
+
+            if (remaining_args.size() > 2)
+                seq_file_2 = remaining_args[2];
         }
 
         const string currentStatus() const
         {
             ostringstream status;
 
-            status  << "low_count: " << low_count << endl
-                    << "high_count: " << high_count << endl
-                    << "low_gc: " << low_gc << endl
-                    << "high_gc: " << high_gc << endl
-                    << "discard: " << discard << endl
-                    << "gc_perc: " << gc_perc << endl
-                    << "threads: " << threads << endl
-                    << "output: " << output << endl
+            status  << "discard: " << discard << endl
+                    << "output: " << output_prefix << endl
                     << "seq_file_1: " << seq_file_1 << endl
                     << "seq_file_2: " << seq_file_2 << endl
                     << "jellyfish_hash: " << jellyfish_hash << endl;
@@ -191,42 +144,24 @@ namespace kat
 
     public:
 
-        uint64_t        low_count;
-        uint64_t        high_count;
-        uint64_t        low_gc;
-        uint64_t        high_gc;
-        uint16_t        threads;
         bool            discard;
-        bool            gc_perc;
-        string          output;
+        string          output_prefix;
         string          seq_file_1;
         string          seq_file_2;
         string          jellyfish_hash;
 
-        SeqFilterArgs() : BaseArgs(REF_MIN_ARGS),
-            low_count(DEFAULT_REF_LOW_COUNT),
-            high_count(DEFAULT_REF_HIGH_COUNT),
-            low_gc(DEFAULT_REF_LOW_GC),
-            high_gc(DEFAULT_REF_HIGH_GC),
-            discard(DEFAULT_REF_DISCARD),
-            gc_perc(DEFAULT_REF_GC_PERC),
-            threads(DEFAULT_REF_THREADS),
-            output(DEFAULT_REF_OUTPUT),
-            seq_file_1(DEFAULT_REF_SEQ_FILE_1),
-            seq_file_2(DEFAULT_REF_SEQ_FILE_2)
+        SeqFilterArgs() : BaseArgs(FILTER_SEQ_MIN_ARGS),
+            discard(DEFAULT_FILTER_SEQ_DISCARD),
+            output_prefix(DEFAULT_FILTER_SEQ_OUTPUT_PREFIX),
+            seq_file_1(DEFAULT_FILTER_SEQ_SEQ_FILE_1),
+            seq_file_2(DEFAULT_FILTER_SEQ_SEQ_FILE_2)
         { }
 
-        SeqFilterArgs(int argc, char* argv[]) : BaseArgs(REF_MIN_ARGS),
-            low_count(DEFAULT_REF_LOW_COUNT),
-            high_count(DEFAULT_REF_HIGH_COUNT),
-            low_gc(DEFAULT_REF_LOW_GC),
-            high_gc(DEFAULT_REF_HIGH_GC),
-            discard(DEFAULT_REF_DISCARD),
-            gc_perc(DEFAULT_REF_GC_PERC),
-            threads(DEFAULT_REF_THREADS),
-            output(DEFAULT_REF_OUTPUT),
-            seq_file_1(DEFAULT_REF_SEQ_FILE_1),
-            seq_file_2(DEFAULT_REF_SEQ_FILE_2)
+        SeqFilterArgs(int argc, char* argv[]) : BaseArgs(FILTER_SEQ_MIN_ARGS),
+            discard(DEFAULT_FILTER_SEQ_DISCARD),
+            output_prefix(DEFAULT_FILTER_SEQ_OUTPUT_PREFIX),
+            seq_file_1(DEFAULT_FILTER_SEQ_SEQ_FILE_1),
+            seq_file_2(DEFAULT_FILTER_SEQ_SEQ_FILE_2)
         { parse(argc, argv); }
 
         ~SeqFilterArgs() {}

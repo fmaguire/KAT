@@ -51,10 +51,10 @@ int kat::seqFilterStart(int argc, char *argv[])
     }
 
     // Create the sequence coverage object
-    SeqFilter<hash_query_t> ref(&args);
+    SeqFilter seq_filter(&args);
 
     // Do the work
-    ref.do_it();
+    seq_filter.do_it();
 
     // That's it!  Just exit now.
     return 0;

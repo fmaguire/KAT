@@ -27,8 +27,8 @@
 #include <math.h>
 
 #include <seqan/basic.h>
-#include <seqan/sequence.h>
 #include <seqan/seq_io.h>
+#include <seqan/sequence.h>
 
 #include <jellyfish/hash.hpp>
 #include <jellyfish/thread_exec.hpp>
@@ -38,39 +38,44 @@
 
 #include "seq_filter_args.hpp"
 
-using seqan::SequenceStream;
-using seqan::StringSet;
-using seqan::String;
-using seqan::CharString;
-using seqan::Dna5String;
+using std::fstream;
+using std::ostringstream;
+using std::cerr;
+using std::ios;
+
 
 namespace kat
 {
-    template<typename hash_t>
-    class SeqFilter : public thread_exec
+
+    class SeqFilterCounter
+    {
+    public:
+        uint64_t nb_records;
+        uint64_t nb_kept;
+
+        SeqFilterCounter() : nb_records(0), nb_kept(0)
+        {
+        }
+
+        SeqFilterCounter(uint64_t _nb_records, uint64_t _nb_kept) :
+            nb_records(_nb_records), nb_kept(_nb_kept)
+        {
+        }
+    };
+
+    class SeqFilter
     {
     private:
         // Arguments from user
         SeqFilterArgs *args;
 
         JellyfishHelper                 *jfh;
-        hash_t                          *hash;		// Jellyfish hash
-
-        // Set as we go
-        float low_gc_perc;
-        float high_gc_perc;
+        hash_query_t                    *hash;		// Jellyfish hash
 
 
     public:
         SeqFilter(SeqFilterArgs* _args) : args(_args)
         {
-            // Some validation first
-            if(args->high_count < args->low_count)
-                throw "High kmer count value must be >= to low kmer count value";
-
-            if(args->high_gc < args->low_gc)
-                throw "High GC count value must be >= to low GC count value";
-
             if (args->verbose)
                 cerr << "Setting up read filtering tool..." << endl;
 
@@ -94,139 +99,337 @@ namespace kat
 
         void do_it()
         {
-            // Open file, create RecordReader and check all is well
-            std::fstream in(args->seq_file_1.c_str(), std::ios::in);
-            seqan::RecordReader<std::fstream, seqan::SinglePass<> > reader1(in);
+            bool have_seq_1 = !args->seq_file_1.empty();
+            bool have_seq_2 = !args->seq_file_2.empty();
 
-            std::fstream in(args->input_sequences.c_str(), std::ios::in);
-            seqan::RecordReader<std::fstream, seqan::SinglePass<> > reader2(in);
+            if (!have_seq_1 && !have_seq_2)
+                throw "No sequence files were specified";
 
+            if (!have_seq_1)
+                throw "First sequence file not specified";
 
+            std::ostream* out_stream = args->verbose ? &cerr : (std::ostream*)0;
 
-            // Create the AutoSeqStreamFormat object and guess the file format.
-            seqan::AutoSeqStreamFormat formatTag1;
-            if (!guessStreamFormat(reader1, formatTag))
-            {
-                std::cerr << "ERROR: Could not detect file format for: " << args->input_sequences << endl;
-                return;
-            }
+            // Load the jellyfish hash
+            hash = jfh->loadHash(false, out_stream);
 
+            // Filter the sequences and return the counts
+            SeqFilterCounter counter = have_seq_2 ? processPairs() : processSingles();
 
-            // Setup output streams for files
-            if (args->verbose)
-                *out_stream << endl;
+            uint32_t nb_records_filtered = counter.nb_records - counter.nb_kept;
 
-            // Sequence K-mer counts output stream
-            std::ostringstream count_path;
-            count_path << args->output_prefix << "_counts.cvg";
-            ofstream_default count_path_stream(count_path.str().c_str(), cout);
-
-            // Average sequence coverage and GC% scores output stream
-            std::ostringstream cvg_gc_path;
-            cvg_gc_path << args->output_prefix << "_stats.csv";
-            ofstream_default cvg_gc_stream(cvg_gc_path.str().c_str(), cout);
-            cvg_gc_stream << "seq_name coverage gc% seq_length" << endl;
-
-            CharString id1;
-            Dna5String dna5seq1;
-            CharString qual1;
-
-            CharString id2;
-            Dna5String dna5seq2;
-            CharString qual2;
-
-            uint32_t nb_records_read = 0;
-            uint32_t nb_records_written = 0;
-
-            if (args->verbose)
-                *out_stream << "Processing sequences..." << endl;
-
-            bool haveSeq1 = !args->seq_file_1.empty();
-            bool haveSeq2 = !args->seq_file_2.empty();
-
-            // Processes sequences in batches of records to reduce memory requirements
-            while(!atEnd(reader1))
-            {
-                if (readRecord(id, dna5seq, qual, reader1, formatTag1) != 0)
-                {
-                    cerr << "ERROR: Problem reading record from the provided sequence file." << endl;
-                    return;
-                }
-
-                if (readRecord(id, dna5seq, qual, reader1, formatTag1) != 0)
-                {
-                    cerr << "ERROR: Problem reading record from the provided sequence file." << endl;
-                    return;
-                }
-
-                nb_records_read++;
-
-                // There's no substring functionality in SeqAn in this version (1.4.1).  So we'll just
-                // use regular c++ string's for this bit.  The next version of SeqAn may offer substring
-                // functionality, at which time I might change this code to make it run faster using
-                // SeqAn's datastructures.
-                stringstream ssSeq;
-                ssSeq << dna5seq;
-                string seq = ssSeq.str();
-
-                // Check to see if we want to keep this sequence, and if so write to file
-                if (keepSeq(seq))
-                {
-
-                    if (seqan::writeRecord(out, id, seq, qual, formatTag) != 0)
-                    {
-                        cerr << "ERROR: Problem writing record from the provided sequence file." << endl;
-                        return;
-                    }
-
-                    nb_records_written++;
-                }
-            }
-
-
-            uint32_t nb_records_filtered = nb_records_read - nb_records_written;
-
-            *out_stream << "Processed : " << nb_records_read << endl
-                        << "Filtered  : " << nb_records_filtered << endl
-                        << "Kept      : " << nb_records_written << endl;
-
+            cerr << "Processed : " << counter.nb_records << endl
+                 << "Filtered  : " << nb_records_filtered << endl
+                 << "Kept      : " << counter.nb_kept << endl;
         }
 
 
     private:
 
+        SeqFilterCounter processSingles()
+        {
+            // Open file, create RecordReader and check all is well
+            fstream in(args->seq_file_1.c_str(), ios::in);
+            seqan::RecordReader<fstream, seqan::SinglePass<> > reader(in);
+
+            // Create the AutoSeqStreamFormat object and guess the file format.
+            seqan::AutoSeqStreamFormat formatTag;
+            if (!guessStreamFormat(reader, formatTag))
+            {
+                stringstream ss;
+                ss << "ERROR: Could not detect file format for: " << args->seq_file_1 << endl;
+                throw ss.str();
+            }
+
+            seqan::CharString out_path = args->output_prefix.c_str();
+            append(out_path, ".");
+            append(out_path, getAutoSeqStreamFormatName(formatTag));
+
+
+            seqan::SequenceStream hash_out(
+                                    toCString(out_path),
+                                    seqan::SequenceStream::WRITE,
+                                    seqan::SequenceStream::FASTQ,
+                                    seqan::SequenceStream::AUTO_TYPE);
+            if (!isGood(hash_out))
+            {
+                stringstream ss;
+                ss << "ERROR: Could not open the output file: " << toCString(out_path) << endl;
+                throw ss.str();
+            }
+
+
+            uint64_t nb_records_read = 0;
+            uint64_t nb_records_written = 0;
+
+            std::ostream* out_stream = args->verbose ? &cerr : (std::ostream*)0;
+
+            *out_stream << "Processing sequences..." << endl;
+
+            uint16_t k = hash->get_mer_len();
+
+            // Processes sequences in batches of records to reduce memory requirements
+            while(!atEnd(reader))
+            {
+                seqan::CharString id;
+                seqan::Dna5String dna5seq;
+                seqan::CharString qual;
+
+                if (readRecord(id, dna5seq, qual, reader, formatTag) != 0)
+                {
+                    stringstream ss;
+                    ss << "ERROR: Problem reading record from: " << args->seq_file_1 << endl;
+                    throw ss.str();
+                }
+
+                nb_records_read++;
+
+                string seq;
+                convertSeq(dna5seq, seq);
+
+                uint64_t seq_length = seq.length();
+                uint64_t nb_kmers_seq = seq_length - k + 1;
+
+                if (seq_length < k)
+                {
+                    cerr << seq << " from R1 is too short to compute coverage.  Sequence length is "
+                         << seq_length << " and K-mer length is " << k << ". Discarding sequence." << endl;
+
+                    continue;
+                }
+
+                // Check to see if we want to keep this sequence, and if so write to file
+                bool keep_seq = keepSeq(seq);
+
+                if (keep_seq)
+                {
+                    //if (writeRecord(hash_out, id, seq, qual) != 0)
+                    /*if (writeRecord(hash_out, id, seq) != 0)
+                    {
+                        stringstream ss;
+                        ss << "ERROR: Problem writing record to: " << endl;
+                        throw ss.str();
+                    }*/
+
+                    nb_records_written++;
+                }
+            }
+
+            return SeqFilterCounter(nb_records_read, nb_records_written);
+        }
+
+        SeqFilterCounter processPairs()
+        {
+            // Open file, create RecordReader and check all is well
+            fstream in1(args->seq_file_1.c_str(), ios::in);
+            seqan::RecordReader<fstream, seqan::SinglePass<> > reader1(in1);
+
+            fstream in2(args->seq_file_2.c_str(), ios::in);
+            seqan::RecordReader<fstream, seqan::SinglePass<> > reader2(in2);
+
+            // Create the AutoSeqStreamFormat object and guess the file format.
+            seqan::AutoSeqStreamFormat formatTag1;
+            if (!guessStreamFormat(reader1, formatTag1))
+            {
+                stringstream ss;
+                ss << "ERROR: Could not detect file format for: " << args->seq_file_1 << endl;
+                throw ss.str();
+            }
+
+            // Create the AutoSeqStreamFormat object and guess the file format.
+            seqan::AutoSeqStreamFormat formatTag2;
+            if (!guessStreamFormat(reader2, formatTag2))
+            {
+                stringstream ss;
+                ss << "ERROR: Could not detect file format for: " << args->seq_file_2 << endl;
+                throw ss.str();
+            }
+
+            if (formatTag1.tagId != formatTag2.tagId)
+            {
+                stringstream ss;
+                ss << "ERROR: Files are different format." << endl;
+                throw ss.str();
+            }
+
+            // Make files names
+            seqan::CharString out_path_1 = args->output_prefix.c_str();
+            append(out_path_1, "_R1.");
+            append(out_path_1, getAutoSeqStreamFormatName(formatTag1));
+
+            seqan::CharString out_path_2 = args->output_prefix.c_str();
+            append(out_path_2, "_R2.");
+            append(out_path_2, getAutoSeqStreamFormatName(formatTag2));
+
+
+            seqan::SequenceStream hash_out_1(
+                                toCString(out_path_1),
+                                seqan::SequenceStream::WRITE,
+                                seqan::SequenceStream::FASTQ,
+                                seqan::SequenceStream::AUTO_TYPE);
+            if (!isGood(hash_out_1))
+            {
+                stringstream ss;
+                ss << "ERROR: Could not open the output file: " << toCString(out_path_1) << endl;
+                throw ss.str();
+            }
+
+            seqan::SequenceStream hash_out_2(
+                                toCString(out_path_2),
+                                seqan::SequenceStream::WRITE,
+                                seqan::SequenceStream::FASTQ,
+                                seqan::SequenceStream::AUTO_TYPE);
+            if (!isGood(hash_out_2))
+            {
+                stringstream ss;
+                ss << "ERROR: Could not open the output file: " << toCString(out_path_2) << endl;
+                throw ss.str();
+            }
+
+
+            uint64_t nb_records_read = 0;
+            uint64_t nb_records_written = 0;
+
+            std::ostream* out_stream = args->verbose ? &cerr : (std::ostream*)0;
+
+            *out_stream << "Processing sequences..." << endl;
+
+            // Processes sequences in batches of records to reduce memory requirements
+            while(!atEnd(reader1) && !atEnd(reader2))
+            {
+                seqan::CharString id1;
+                seqan::Dna5String dna5seq1;
+                seqan::CharString qual1;
+
+                seqan::CharString id2;
+                seqan::Dna5String dna5seq2;
+                seqan::CharString qual2;
+
+                if (readRecord(id1, dna5seq1, qual1, reader1, formatTag1) != 0)
+                {
+                    stringstream ss;
+                    ss << "ERROR: Problem reading record from: " << args->seq_file_1 << endl;
+                    throw ss.str();
+                }
+
+                if (readRecord(id2, dna5seq2, qual2, reader2, formatTag2) != 0)
+                {
+                    stringstream ss;
+                    ss << "ERROR: Problem reading record from: " << args->seq_file_2 << endl;
+                    throw ss.str();
+                }
+
+                nb_records_read++;
+
+                string seq1, seq2;
+                convertSeq(dna5seq1, seq1);
+                convertSeq(dna5seq2, seq2);
+
+
+                uint16_t k = hash->get_mer_len();
+                uint64_t seq1_length = seq1.length();
+                uint64_t seq2_length = seq2.length();
+                uint64_t nb_kmers_seq1 = seq1_length - k + 1;
+                uint64_t nb_kmers_seq2 = seq2_length - k + 1;
+
+                if (seq1_length < k)
+                {
+                    cerr << seq1 << " from R1 is too short to compute coverage.  Sequence length is "
+                         << seq1_length << " and K-mer length is " << k << ". Discarding sequence." << endl;
+
+                    continue;
+                }
+
+                if (seq2_length < k)
+                {
+                    cerr << seq2 << " from R2 is too short to compute coverage.  Sequence length is "
+                         << seq2_length << " and K-mer length is " << k << ". Discarding sequence." << endl;
+
+                    continue;
+                }
+
+                // Check to see if we want to keep this sequence, and if so write to file
+                bool keep_seq = keepSeq(seq1) && keepSeq(seq2);
+
+                if (keep_seq)
+                {
+                    //if (writeRecord(hash_out_1, id1, seq1, qual1) != 0)
+                    /*if (writeRecord(hash_out_1, id1, seq1) != 0)
+                    {
+                        stringstream ss;
+                        ss << "ERROR: Problem writing record to: " << endl;
+                        throw ss.str();
+                    }*/
+
+                    //if (writeRecord(hash_out_2, id2, seq2, qual2) != 0)
+                    /*if (writeRecord(hash_out_2, id2, seq2) != 0)
+                    {
+                        stringstream ss;
+                        ss << "ERROR: Problem writing record from the provided sequence file." << endl;
+                        throw ss.str();
+                    }*/
+
+                    nb_records_written++;
+                }
+            }
+
+            return SeqFilterCounter(nb_records_read, nb_records_written);
+        }
+
+
+
+
+        // There's no substring functionality in SeqAn in this version (1.4.1).  So we'll just
+        // use regular c++ string's for this bit.  The next version of SeqAn may offer substring
+        // functionality, at which time I might change this code to make it run faster using
+        // SeqAn's datastructures.
+        void convertSeq(seqan::Dna5String& from, string& to)
+        {
+            stringstream ssSeq;
+            ssSeq << from;
+            to = ssSeq.str();
+        }
 
         bool keepSeq(string& seq)
         {
+            uint16_t k = hash->get_mer_len();
+            uint64_t seq_length = seq.length();
+            uint64_t nb_kmers = seq_length - k + 1;
 
-            if (args->gc)
+            bool found = false;
+
+            if (seq_length < k)
             {
+                cerr << seq << " is too short to compute coverage.  Sequence length is "
+                     << seq_length << " and K-mer length is " << k << ". Discarding sequence." << endl;
 
-            }
-            else
-            // Calculate GC%
-            float gc_perc = kat::calcGCPercentage(seq);
-
-            // Are we within the limits
-            bool in_gc_limits = args->low_gc <= gc_perc && gc_perc <= args->high_gc;
-
-            // Check to see if we want to keep this sequence based on its GC content
-            if ((in_gc_limits && args->discard) || (!in_gc_limits && !args->discard))
-            {
                 return false;
             }
+            else
+            {
+                for(uint64_t i = 0; i < nb_kmers; i++)
+                {
+                    string merstr = seq.substr(i, k);
 
-            // Now calculate the mean coverage
-            float mean_cvg = kat::calcMeanCoverage(seq, hash);
+                    // Jellyfish compacted hash does not support Ns so if we find one then just skip to the next mer
+                    if (merstr.find("N") == string::npos)
+                    {
+                        const char* mer = merstr.c_str();
+                        uint_t count = (*hash)[mer];
 
-            // Convert to logscale
-            float log_cvg = args->cvg_logscale ? log10(mean_cvg) : mean_cvg;
+                        if (count > 0)
+                        {
+                            found = true;
 
-            // Are we within the limits
-            bool in_cvg_limits = args->low_count <= log_cvg && log_cvg <= args->high_count;
+                            if (args->discard)
+                                return false;
+                        }
+                    }
 
-            // Return if we want to keep this sequence or not based on the coverage (and, if we've got this far, GC)
-            return (in_cvg_limits && !args->discard) || (!in_cvg_limits && args->discard);
+                }
+            }
+
+            return (found && !args->discard) || (!found && args->discard);
         }
 
     };

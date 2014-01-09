@@ -134,10 +134,10 @@ namespace kat
             uint_t val_len = input_hash->get_val_len();
 
             // Setup output hash, storage and dumper based on details from the input hash
-            hash_reader_t* output_storage = NULL; //new inv_hash_storage_t(hash_size, 2*kmer_len,
-                                    //val_len, input_hash->get_max_reprobe(), jellyfish::quadratic_reprobes);
+            inv_hash_storage_t storage(hash_size, 2*kmer_len, val_len, input_hash->get_max_reprobe(), jellyfish::quadratic_reprobes);
+            //hash_reader_t iter(db_file, args.out_buffer_size_arg);
 
-            hash_writer_t output_hash(input_hash->get_nb_mers(), kmer_len, val_len, output_storage);
+            jellyfish::compacted_hash::writer<inv_hash_storage_t> hash_writer(input_hash->get_nb_mers(), kmer_len, val_len, &storage);
 
             // Go through this thread's slice for hash
             while (hashIt.next())
@@ -149,7 +149,7 @@ namespace kat
                 {
                     uint64_t kmer_binary = jellyfish::parse_dna::mer_string_to_binary(kmer.c_str(), kmer_len);
 
-                    output_hash.append(kmer_binary, kmer_count);
+                    hash_writer.append(kmer_binary, kmer_count);
                 }
             }
 
@@ -158,7 +158,8 @@ namespace kat
 
             // Output hash to file
             ofstream_default hash_out_stream(args->output.c_str(), cout);
-            output_hash.dump(&hash_out_stream);
+            hash_writer.write_header(&hash_out_stream);
+            hash_writer.dump(&hash_out_stream);
             hash_out_stream.close();
 
 

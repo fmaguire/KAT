@@ -35,18 +35,14 @@ using std::ostringstream;
 
 namespace kat
 {
-    const uint64_t  DEFAULT_REF_LOW_COUNT    = 0;
-    const uint64_t  DEFAULT_REF_HIGH_COUNT   = 10000;
-    const uint16_t  DEFAULT_REF_LOW_GC       = 0;
-    const uint16_t  DEFAULT_REF_HIGH_GC      = 10000;
-    const bool      DEFAULT_REF_DISCARD      = false;
-    const bool      DEFAULT_REF_GC_PERC      = false;
-    const char*     DEFAULT_REF_OUTPUT       = "kat.ref";
-    const char*     DEFAULT_REF_SEQ_FILE_1   = "";
-    const char*     DEFAULT_REF_SEQ_FILE_2   = "";
+    const uint64_t  DEFAULT_FILTER_KMER_LOW_COUNT    = 0;
+    const uint64_t  DEFAULT_FILTER_KMER_HIGH_COUNT   = 10000;
+    const uint16_t  DEFAULT_FILTER_KMER_LOW_GC       = 0;
+    const uint16_t  DEFAULT_FILTER_KMER_HIGH_GC      = 31;
+    const bool      DEFAULT_FILTER_KMER_DISCARD      = false;
+    const char*     DEFAULT_FILTER_KMER_OUTPUT       = "kat.ref";
 
-
-    const uint16_t  REF_MIN_ARGS = 1;
+    const uint16_t  FILTER_KMER_MIN_ARGS = 1;
 
 
     class KmerFilterArgs : public BaseArgs
@@ -58,12 +54,12 @@ namespace kat
 
         const string usage() const
         {
-            return "Usage: kat ref [options] [-i <seq_file1> -j <seq_file2>] <jellyfish_hash>";
+            return "Usage: kat filter kmer [options] <jellyfish_hash>";
         }
 
         const string shortDescription() const
         {
-            return "Filters sequences based on gc and kmer coverage limits.";
+            return "Filters kmers in a jellyfish hash based on gc and kmer coverage limits.";
         }
 
         const string longDescription() const
@@ -71,8 +67,8 @@ namespace kat
             string long_desc = "The GCP tool allows the user to quickly and easily see content int a kmer hash that is " \
                     " differentiated by GC or kmer coverage.  Sometimes this allows the user to identify contamination, " \
                     " or otherwise suspcious / interesting content within a sample, and in that case the user may wish " \
-                    " to either isolate or discard the kmers and/or external sequences associated with this content.  " \
-                    " This tool \"ref\" allows the user to do exactly that.";
+                    " to either isolate or discard the kmers associated with this content.  " \
+                    " This kmer filtering tool allows the user to do exactly that.";
 
             return lineBreakString(long_desc, 78, "  ");
         }
@@ -81,15 +77,12 @@ namespace kat
         {
             ostringstream help_str;
 
-            help_str << " -o, --output_prefix=path    Output prefix for the filtered file and hash. (\"" << DEFAULT_REF_OUTPUT << "\")" << endl
-                     << " -i, --seq_file_1=path       The input sequence file to filter.  If you are using paired data this option specifies the first file." << endl
-                     << " -j, --seq_file_2=path       The second input sequence file to filter if you are using paired data." << endl
-                     << " -l, --low_count=uint64      Low kmer count limit (" << DEFAULT_REF_LOW_COUNT << ")" << endl
-                     << " -h, --high_count=uint64     High kmer count limit (" << DEFAULT_REF_HIGH_COUNT << ")" << endl
-                     << " -x, --low_gc=uint16         Low GC count limit. (\"" << DEFAULT_REF_LOW_GC << "\")" << endl
-                     << " -y, --high_gc=uint16        High GC count limit. (\"" << DEFAULT_REF_HIGH_GC << "\")" << endl
-                     << " -d, --discard_selection     Discard kmers and sequences equal to or within the limits rather than outside the limits." << endl
-                     << " -g, --gc_perc               GC limits are defined as percentages, not raw counts." << endl;
+            help_str << " -o, --output_prefix=path    Output prefix for the filtered file and hash. (\"" << DEFAULT_FILTER_KMER_OUTPUT << "\")" << endl
+                     << " -l, --low_count=uint64      Low kmer count limit (" << DEFAULT_FILTER_KMER_LOW_COUNT << ")" << endl
+                     << " -h, --high_count=uint64     High kmer count limit (" << DEFAULT_FILTER_KMER_HIGH_COUNT << ")" << endl
+                     << " -x, --low_gc=uint16         Low GC count limit. (\"" << DEFAULT_FILTER_KMER_LOW_GC << "\")" << endl
+                     << " -y, --high_gc=uint16        High GC count limit. (\"" << DEFAULT_FILTER_KMER_HIGH_GC << "\")" << endl
+                     << " -d, --discard_selection     Discard kmers and sequences equal to or within the limits rather than outside the limits." << endl;
 
             return help_str.str();
         }
@@ -99,19 +92,16 @@ namespace kat
             static struct option long_options_array[] =
             {
                 {"output",              required_argument,  0, 'o'},
-                {"seq_file_1",          required_argument,  0, 'i'},
-                {"seq_file_2",          required_argument,  0, 'j'},
                 {"low_count",           required_argument,  0, 'l'},
                 {"high_count",          required_argument,  0, 'h'},
                 {"low_gc",              required_argument,  0, 'x'},
                 {"high_gc",             required_argument,  0, 'y'},
-                {"discard_selection",   no_argument,        0, 'd'},
-                {"gc_perc",             no_argument,        0, 'g'}
+                {"discard_selection",   no_argument,        0, 'd'}
             };
 
             vector<option>* long_options = new vector<option>();
 
-            for(uint8_t i = 0; i < 9; i++)
+            for(uint8_t i = 0; i < 6; i++)
             {
                 long_options->push_back(long_options_array[i]);
             }
@@ -121,7 +111,7 @@ namespace kat
 
         string shortOptions()
         {
-            return "o:i:j:l:h:x:y:dg";
+            return "o:l:h:x:y:d";
         }
 
         void setOption(int c, string& option_arg) {
@@ -130,12 +120,6 @@ namespace kat
             {
             case 'o':
                 output = string(optarg);
-                break;
-            case 'i':
-                seq_file_1 = string(optarg);
-                break;
-            case 'j':
-                seq_file_2 = string(optarg);
                 break;
             case 'l':
                 low_count = strToInt64(optarg);
@@ -152,10 +136,6 @@ namespace kat
             case 'd':
                 discard = true;
                 break;
-            case 'g':
-                gc_perc = true;
-                break;
-
             }
         }
 
@@ -173,10 +153,7 @@ namespace kat
                     << "low_gc: " << low_gc << endl
                     << "high_gc: " << high_gc << endl
                     << "discard: " << discard << endl
-                    << "gc_perc: " << gc_perc << endl
                     << "output: " << output << endl
-                    << "seq_file_1: " << seq_file_1 << endl
-                    << "seq_file_2: " << seq_file_2 << endl
                     << "jellyfish_hash: " << jellyfish_hash << endl;
 
             return status.str().c_str();
@@ -189,34 +166,25 @@ namespace kat
         uint32_t        low_gc;
         uint32_t        high_gc;
         bool            discard;
-        bool            gc_perc;
         string          output;
-        string          seq_file_1;
-        string          seq_file_2;
         string          jellyfish_hash;
 
-        KmerFilterArgs() : BaseArgs(REF_MIN_ARGS),
-            low_count(DEFAULT_REF_LOW_COUNT),
-            high_count(DEFAULT_REF_HIGH_COUNT),
-            low_gc(DEFAULT_REF_LOW_GC),
-            high_gc(DEFAULT_REF_HIGH_GC),
-            discard(DEFAULT_REF_DISCARD),
-            gc_perc(DEFAULT_REF_GC_PERC),
-            output(DEFAULT_REF_OUTPUT),
-            seq_file_1(DEFAULT_REF_SEQ_FILE_1),
-            seq_file_2(DEFAULT_REF_SEQ_FILE_2)
+        KmerFilterArgs() : BaseArgs(FILTER_KMER_MIN_ARGS),
+            low_count(DEFAULT_FILTER_KMER_LOW_COUNT),
+            high_count(DEFAULT_FILTER_KMER_HIGH_COUNT),
+            low_gc(DEFAULT_FILTER_KMER_LOW_GC),
+            high_gc(DEFAULT_FILTER_KMER_HIGH_GC),
+            discard(DEFAULT_FILTER_KMER_DISCARD),
+            output(DEFAULT_FILTER_KMER_OUTPUT)
         { }
 
-        KmerFilterArgs(int argc, char* argv[]) : BaseArgs(REF_MIN_ARGS),
-            low_count(DEFAULT_REF_LOW_COUNT),
-            high_count(DEFAULT_REF_HIGH_COUNT),
-            low_gc(DEFAULT_REF_LOW_GC),
-            high_gc(DEFAULT_REF_HIGH_GC),
-            discard(DEFAULT_REF_DISCARD),
-            gc_perc(DEFAULT_REF_GC_PERC),
-            output(DEFAULT_REF_OUTPUT),
-            seq_file_1(DEFAULT_REF_SEQ_FILE_1),
-            seq_file_2(DEFAULT_REF_SEQ_FILE_2)
+        KmerFilterArgs(int argc, char* argv[]) : BaseArgs(FILTER_KMER_MIN_ARGS),
+            low_count(DEFAULT_FILTER_KMER_LOW_COUNT),
+            high_count(DEFAULT_FILTER_KMER_HIGH_COUNT),
+            low_gc(DEFAULT_FILTER_KMER_LOW_GC),
+            high_gc(DEFAULT_FILTER_KMER_HIGH_GC),
+            discard(DEFAULT_FILTER_KMER_DISCARD),
+            output(DEFAULT_FILTER_KMER_OUTPUT)
         { parse(argc, argv); }
 
         ~KmerFilterArgs() {}
