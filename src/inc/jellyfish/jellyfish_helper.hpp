@@ -100,7 +100,7 @@ public:
         }
         else
         {
-            cerr << "Can't process jellyfish hash.  Wrong hash type.  Can only process compacted hash.\n";
+            cerr << "Can't process jellyfish hash: " << type << ". Can only process compacted hash.\n";
             throw;
         }
     }

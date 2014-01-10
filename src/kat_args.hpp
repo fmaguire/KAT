@@ -31,12 +31,12 @@ using std::endl;
 
 namespace kat
 {
-    const string KAT_SECT_ID  = "sect";
-    const string KAT_COMP_ID  = "comp";
-    const string KAT_GCP_ID   = "gcp";
-    const string KAT_HIST_ID  = "hist";
-    const string KAT_REF_ID  = "ref";
-    const string KAT_PLOT_ID  = "plot";
+    const string KAT_SECT_ID   = "sect";
+    const string KAT_COMP_ID   = "comp";
+    const string KAT_GCP_ID    = "gcp";
+    const string KAT_HIST_ID   = "hist";
+    const string KAT_FILT_ID = "filt";
+    const string KAT_PLOT_ID   = "plot";
 
     const uint16_t MIN_ARGS = 0;
 
@@ -64,6 +64,7 @@ namespace kat
                     "            count.\n" \
                     "   - hist:  Create an histogram of k-mer occurrences from a jellyfish hash.  Adds metadata in output for easy\n" \
                     "            plotting.\n" \
+                    "   - filt:  Filtering tool.  Contains several filtering tools for filtering jellyfish hashes or sequences.\n" \
                     "   - plot:  Plotting tool.  Contains several plotting tools to visualise K-mer and compare distributions.\n" \
                     "            Requires gnuplot.";
         }
@@ -144,7 +145,7 @@ namespace kat
                     mode_str.compare(KAT_COMP_ID) == 0 ||
                     mode_str.compare(KAT_GCP_ID) == 0 ||
                     mode_str.compare(KAT_HIST_ID) == 0 ||
-                    mode_str.compare(KAT_REF_ID) == 0 ||
+                    mode_str.compare(KAT_FILT_ID) == 0 ||
                     mode_str.compare(KAT_PLOT_ID) == 0) ?
                         true : false;
         }

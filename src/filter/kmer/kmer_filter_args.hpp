@@ -35,14 +35,15 @@ using std::ostringstream;
 
 namespace kat
 {
-    const uint64_t  DEFAULT_FILTER_KMER_LOW_COUNT    = 0;
-    const uint64_t  DEFAULT_FILTER_KMER_HIGH_COUNT   = 10000;
-    const uint16_t  DEFAULT_FILTER_KMER_LOW_GC       = 0;
-    const uint16_t  DEFAULT_FILTER_KMER_HIGH_GC      = 31;
-    const bool      DEFAULT_FILTER_KMER_DISCARD      = false;
-    const char*     DEFAULT_FILTER_KMER_OUTPUT       = "kat.ref";
+    const uint64_t  DEFAULT_FILT_KMER_LOW_COUNT    = 0;
+    const uint64_t  DEFAULT_FILT_KMER_HIGH_COUNT   = 10000;
+    const uint16_t  DEFAULT_FILT_KMER_LOW_GC       = 0;
+    const uint16_t  DEFAULT_FILT_KMER_HIGH_GC      = 31;
+    const bool      DEFAULT_FILT_KMER_INVERT       = false;
+    const bool      DEFAULT_FILT_KMER_SEPARATE     = false;
+    const char*     DEFAULT_FILT_KMER_OUTPUT       = "kat.filt.kmer";
 
-    const uint16_t  FILTER_KMER_MIN_ARGS = 1;
+    const uint16_t  FILT_KMER_MIN_ARGS = 1;
 
 
     class KmerFilterArgs : public BaseArgs
@@ -54,7 +55,7 @@ namespace kat
 
         const string usage() const
         {
-            return "Usage: kat filter kmer [options] <jellyfish_hash>";
+            return "Usage: kat filt kmer [options] <jellyfish_hash>";
         }
 
         const string shortDescription() const
@@ -77,12 +78,15 @@ namespace kat
         {
             ostringstream help_str;
 
-            help_str << " -o, --output_prefix=path    Output prefix for the filtered file and hash. (\"" << DEFAULT_FILTER_KMER_OUTPUT << "\")" << endl
-                     << " -l, --low_count=uint64      Low kmer count limit (" << DEFAULT_FILTER_KMER_LOW_COUNT << ")" << endl
-                     << " -h, --high_count=uint64     High kmer count limit (" << DEFAULT_FILTER_KMER_HIGH_COUNT << ")" << endl
-                     << " -x, --low_gc=uint16         Low GC count limit. (\"" << DEFAULT_FILTER_KMER_LOW_GC << "\")" << endl
-                     << " -y, --high_gc=uint16        High GC count limit. (\"" << DEFAULT_FILTER_KMER_HIGH_GC << "\")" << endl
-                     << " -d, --discard_selection     Discard kmers and sequences equal to or within the limits rather than outside the limits." << endl;
+            help_str << " -o, --output_prefix=path    Output prefix for the filtered file and hash. (\"" << DEFAULT_FILT_KMER_OUTPUT << "\")" << endl
+                     << " -l, --low_count=uint64      Low kmer count limit (" << DEFAULT_FILT_KMER_LOW_COUNT << ")" << endl
+                     << " -h, --high_count=uint64     High kmer count limit (" << DEFAULT_FILT_KMER_HIGH_COUNT << ")" << endl
+                     << " -x, --low_gc=uint16         Low GC count limit. (\"" << DEFAULT_FILT_KMER_LOW_GC << "\")" << endl
+                     << " -y, --high_gc=uint16        High GC count limit. (\"" << DEFAULT_FILT_KMER_HIGH_GC << "\")" << endl
+                     << " -i, --invert                Keep kmers that lay outside the defined limits, rather than those inside.  This option" << endl
+                     << "                             is overriden if \"--separate\" is specified." << endl
+                     << " -s, --separate              Separates the kmer hash into two files: one containing the kmers within the defined" << endl
+                     << "                             limits and another containing the kmers outside the limits.  Overrides \"--invert\"." << endl;
 
             return help_str.str();
         }
@@ -96,12 +100,13 @@ namespace kat
                 {"high_count",          required_argument,  0, 'h'},
                 {"low_gc",              required_argument,  0, 'x'},
                 {"high_gc",             required_argument,  0, 'y'},
-                {"discard_selection",   no_argument,        0, 'd'}
+                {"invert",              no_argument,        0, 'i'},
+                {"separate",            no_argument,        0, 's'}
             };
 
             vector<option>* long_options = new vector<option>();
 
-            for(uint8_t i = 0; i < 6; i++)
+            for(uint8_t i = 0; i < 7; i++)
             {
                 long_options->push_back(long_options_array[i]);
             }
@@ -111,7 +116,7 @@ namespace kat
 
         string shortOptions()
         {
-            return "o:l:h:x:y:d";
+            return "o:l:h:x:y:ds";
         }
 
         void setOption(int c, string& option_arg) {
@@ -133,8 +138,11 @@ namespace kat
             case 'y':
                 high_gc = strToInt16(optarg);
                 break;
-            case 'd':
-                discard = true;
+            case 'i':
+                invert = true;
+                break;
+            case 's':
+                separate = true;
                 break;
             }
         }
@@ -152,7 +160,8 @@ namespace kat
                     << "high_count: " << high_count << endl
                     << "low_gc: " << low_gc << endl
                     << "high_gc: " << high_gc << endl
-                    << "discard: " << discard << endl
+                    << "discard: " << invert << endl
+                    << "separate: " << separate << endl
                     << "output: " << output << endl
                     << "jellyfish_hash: " << jellyfish_hash << endl;
 
@@ -165,26 +174,29 @@ namespace kat
         uint64_t        high_count;
         uint32_t        low_gc;
         uint32_t        high_gc;
-        bool            discard;
+        bool            invert;
+        bool            separate;
         string          output;
         string          jellyfish_hash;
 
-        KmerFilterArgs() : BaseArgs(FILTER_KMER_MIN_ARGS),
-            low_count(DEFAULT_FILTER_KMER_LOW_COUNT),
-            high_count(DEFAULT_FILTER_KMER_HIGH_COUNT),
-            low_gc(DEFAULT_FILTER_KMER_LOW_GC),
-            high_gc(DEFAULT_FILTER_KMER_HIGH_GC),
-            discard(DEFAULT_FILTER_KMER_DISCARD),
-            output(DEFAULT_FILTER_KMER_OUTPUT)
+        KmerFilterArgs() : BaseArgs(FILT_KMER_MIN_ARGS),
+            low_count(DEFAULT_FILT_KMER_LOW_COUNT),
+            high_count(DEFAULT_FILT_KMER_HIGH_COUNT),
+            low_gc(DEFAULT_FILT_KMER_LOW_GC),
+            high_gc(DEFAULT_FILT_KMER_HIGH_GC),
+            invert(DEFAULT_FILT_KMER_INVERT),
+            separate(DEFAULT_FILT_KMER_SEPARATE),
+            output(DEFAULT_FILT_KMER_OUTPUT)
         { }
 
-        KmerFilterArgs(int argc, char* argv[]) : BaseArgs(FILTER_KMER_MIN_ARGS),
-            low_count(DEFAULT_FILTER_KMER_LOW_COUNT),
-            high_count(DEFAULT_FILTER_KMER_HIGH_COUNT),
-            low_gc(DEFAULT_FILTER_KMER_LOW_GC),
-            high_gc(DEFAULT_FILTER_KMER_HIGH_GC),
-            discard(DEFAULT_FILTER_KMER_DISCARD),
-            output(DEFAULT_FILTER_KMER_OUTPUT)
+        KmerFilterArgs(int argc, char* argv[]) : BaseArgs(FILT_KMER_MIN_ARGS),
+            low_count(DEFAULT_FILT_KMER_LOW_COUNT),
+            high_count(DEFAULT_FILT_KMER_HIGH_COUNT),
+            low_gc(DEFAULT_FILT_KMER_LOW_GC),
+            high_gc(DEFAULT_FILT_KMER_HIGH_GC),
+            invert(DEFAULT_FILT_KMER_INVERT),
+            separate(DEFAULT_FILT_KMER_SEPARATE),
+            output(DEFAULT_FILT_KMER_OUTPUT)
         { parse(argc, argv); }
 
         ~KmerFilterArgs() {}

@@ -35,13 +35,13 @@ using std::ostringstream;
 
 namespace kat
 {
-    const bool      DEFAULT_FILTER_SEQ_DISCARD       = false;
-    const char*     DEFAULT_FILTER_SEQ_OUTPUT_PREFIX = "kat.filter.seq";
-    const char*     DEFAULT_FILTER_SEQ_SEQ_FILE_1    = "";
-    const char*     DEFAULT_FILTER_SEQ_SEQ_FILE_2    = "";
+    const bool      DEFAULT_FILT_SEQ_DISCARD       = false;
+    const char*     DEFAULT_FILT_SEQ_OUTPUT_PREFIX = "kat.filter.seq";
+    const char*     DEFAULT_FILT_SEQ_FILE_1    = "";
+    const char*     DEFAULT_FILT_SEQ_FILE_2    = "";
 
 
-    const uint16_t  FILTER_SEQ_MIN_ARGS = 2;
+    const uint16_t  FILT_SEQ_MIN_ARGS = 2;
 
 
     class SeqFilterArgs : public BaseArgs
@@ -53,7 +53,7 @@ namespace kat
 
         const string usage() const
         {
-            return "Usage: kat filter seq [options] <jellyfish_hash> <seq_file1> [<seq_file2>]";
+            return "Usage: kat filt seq [options] <jellyfish_hash> <seq_file1> [<seq_file2>]";
         }
 
         const string shortDescription() const
@@ -77,7 +77,7 @@ namespace kat
             ostringstream help_str;
 
             help_str << " -o, --output_prefix=path    Output prefix for the filtered file.  If paired files are input, the " \
-                     << "                             suffix will start with \"_R?.\" (\"" << DEFAULT_FILTER_SEQ_OUTPUT_PREFIX << "\")" << endl
+                     << "                             suffix will start with \"_R?.\" (\"" << DEFAULT_FILT_SEQ_OUTPUT_PREFIX << "\")" << endl
                      << " -d, --discard_selection     Discard sequences that contain kmers in the hash.  By default, this " \
                      << "                             tool will discard sequences that do not have kmers found in the hash." << endl;
 
@@ -104,7 +104,7 @@ namespace kat
 
         string shortOptions()
         {
-            return "o:d:";
+            return "o:d";
         }
 
         void setOption(int c, string& option_arg) {
@@ -122,11 +122,11 @@ namespace kat
 
         void processRemainingArgs(const vector<string>& remaining_args)
         {
-            jellyfish_hash = remaining_args[0];
-            seq_file_1 = remaining_args[1];
+            jellyfish_hash = string(remaining_args[0]);
+            seq_file_1 = string(remaining_args[1]);
 
             if (remaining_args.size() > 2)
-                seq_file_2 = remaining_args[2];
+                seq_file_2 = string(remaining_args[2]);
         }
 
         const string currentStatus() const
@@ -150,18 +150,18 @@ namespace kat
         string          seq_file_2;
         string          jellyfish_hash;
 
-        SeqFilterArgs() : BaseArgs(FILTER_SEQ_MIN_ARGS),
-            discard(DEFAULT_FILTER_SEQ_DISCARD),
-            output_prefix(DEFAULT_FILTER_SEQ_OUTPUT_PREFIX),
-            seq_file_1(DEFAULT_FILTER_SEQ_SEQ_FILE_1),
-            seq_file_2(DEFAULT_FILTER_SEQ_SEQ_FILE_2)
+        SeqFilterArgs() : BaseArgs(FILT_SEQ_MIN_ARGS),
+            discard(DEFAULT_FILT_SEQ_DISCARD),
+            output_prefix(DEFAULT_FILT_SEQ_OUTPUT_PREFIX),
+            seq_file_1(DEFAULT_FILT_SEQ_FILE_1),
+            seq_file_2(DEFAULT_FILT_SEQ_FILE_2)
         { }
 
-        SeqFilterArgs(int argc, char* argv[]) : BaseArgs(FILTER_SEQ_MIN_ARGS),
-            discard(DEFAULT_FILTER_SEQ_DISCARD),
-            output_prefix(DEFAULT_FILTER_SEQ_OUTPUT_PREFIX),
-            seq_file_1(DEFAULT_FILTER_SEQ_SEQ_FILE_1),
-            seq_file_2(DEFAULT_FILTER_SEQ_SEQ_FILE_2)
+        SeqFilterArgs(int argc, char* argv[]) : BaseArgs(FILT_SEQ_MIN_ARGS),
+            discard(DEFAULT_FILT_SEQ_DISCARD),
+            output_prefix(DEFAULT_FILT_SEQ_OUTPUT_PREFIX),
+            seq_file_1(DEFAULT_FILT_SEQ_FILE_1),
+            seq_file_2(DEFAULT_FILT_SEQ_FILE_2)
         { parse(argc, argv); }
 
         ~SeqFilterArgs() {}

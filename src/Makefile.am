@@ -20,6 +20,7 @@ kat_SOURCES = \
                 inc/str_utils.hpp \
                 inc/file_utils.hpp \
 		inc/seq_utils.hpp \
+		inc/seq_utils.cc \
                 inc/common_args.hpp \
                 sect/sect_main.cc \
 		sect/sect.hpp \
@@ -44,7 +45,7 @@ kat_SOURCES = \
 		filter/kmer/kmer_filter.hpp \
 		filter/kmer/kmer_filter_args.hpp \
 		filter/kmer/kmer_filter_main.hpp \
-        filter/seq/seq_filter_main.cc \
+        	filter/seq/seq_filter_main.cc \
 		filter/seq/seq_filter.hpp \
 		filter/seq/seq_filter_args.hpp \
 		filter/seq/seq_filter_main.hpp \

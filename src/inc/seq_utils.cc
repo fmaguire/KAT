@@ -17,7 +17,13 @@
 
 #include <seq_utils.hpp>
 
+#include <iostream>
+#include <jellyfish/hash.hpp>
+#include <jellyfish/mer_counting.hpp>
+
 using std::string;
+using std::cerr;
+using std::endl;
 
 
 uint32_t kat::gcCount(string& seq)
@@ -61,31 +67,32 @@ float kat::calcGCPercentage(string& seq)
 }
 
 // Calc mean coverage
-float kat::calcMeanCoverage(string& seq, hash_t& hash)
+float kat::calcMeanCoverage(string& seq, hash_query_t& jf_hash)
 {
-    uint64_t seqLength = seq.length();
-    uint64_t nbCounts = seqLength - kmer + 1;
+    uint_t k = jf_hash.get_mer_len();
+    uint64_t seq_length = seq.length();
+    uint64_t nb_counts = seq_length - k + 1;
 
-    if (seqLength < kmer)
+    if (seq_length < k)
     {
-        cerr << names[index] << ": " << seq << " is too short to compute coverage.  Sequence length is "
-             << seqLength << " and K-mer length is " << kmer << ". Setting sequence coverage to 0." << endl;
+        cerr << seq << " is too short to compute coverage.  Sequence length is "
+             << seq_length << " and K-mer length is " << k << ". Setting sequence coverage to 0." << endl;
         return -1.0;
     }
     else
     {
         uint64_t sum = 0;
 
-        for(uint64_t i = 0; i < nbCounts; i++)
+        for(uint64_t i = 0; i < nb_counts; i++)
         {
-            string merstr = seq.substr(i, kmer);
+            string merstr = seq.substr(i, k);
 
             // Jellyfish compacted hash does not support Ns so if we find one set this mer count to 0
-            sum += merstr.find("N") != string::npos ? 0 : (*hash)[merstr.c_str()];
+            sum += merstr.find("N") != string::npos ? 0 : jf_hash[merstr.c_str()];
         }
 
         // Assumes simple mean calculation for sequence coverage for now... plug in Bernardo's method later.
-        return (float)sum / (float)nbCounts;
+        return (float)sum / (float)nb_counts;
     }
 
 }

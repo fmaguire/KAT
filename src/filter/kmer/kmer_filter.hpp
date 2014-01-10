@@ -41,20 +41,22 @@ using jellyfish::storage_t;
 
 namespace kat
 {
-    class KmerCounters{
-    public:
-        const char* hash_path;
-        uint64_t nb_distinct;
-        uint64_t nb_kept;
 
-        KmerCounters(const char* _hash_path) :
-            hash_path(_hash_path)
+    class Counter
+    {
+    public:
+        uint64_t distinct;
+        uint64_t total;
+
+        Counter() : distinct(0), total(0)
+        {}
+
+        void increment(uint64_t total_inc)
         {
-            nb_distinct = 0;
-            nb_kept = 0;
+            distinct++;
+            total += total_inc;
         }
     };
-
 
     class KmerFilter
     {
@@ -65,9 +67,6 @@ namespace kat
         JellyfishHelper                 *jfh;
         hash_query_t                    *input_hash;		// Jellyfish hash
         hash_t                          output_hash;		// Jellyfish hash
-
-        // Final data (created by merging thread results)
-        KmerCounters                    *kmer_counters;
 
     public:
         KmerFilter(KmerFilterArgs* _args) : args(_args)
@@ -80,7 +79,7 @@ namespace kat
                 throw "High GC count value must be >= to low GC count value";
 
             if (args->verbose)
-                cerr << "Setting up read filtering tool..." << endl;
+                cerr << "Setting up kmer filtering tool..." << endl;
 
             // Setup handles to load hashes
             jfh = new JellyfishHelper(args->jellyfish_hash);
@@ -88,20 +87,12 @@ namespace kat
             // Ensure hash is null at this stage (we'll load them later)
             input_hash = NULL;
 
-            // Create the final kmer counters
-            kmer_counters = new KmerCounters(args->jellyfish_hash.c_str());
-
             if (args->verbose)
-                cerr << "Sequence filter tool setup successfully." << endl;
+                cerr << "done." << endl;
         }
 
         ~KmerFilter()
         {
-            if (kmer_counters)
-                delete kmer_counters;
-
-            kmer_counters = NULL;
-
             if (jfh)
                 delete jfh;
 
@@ -113,10 +104,10 @@ namespace kat
 
             if (args->verbose)
             {
-                cerr << "Loading hashes..." << endl;
+                cerr << "Loading hash..." << endl;
             }
 
-            std::ostream* out_stream = args->verbose ? &cerr : (std::ostream*)0;
+            std::ostream* out_stream = &cerr;
 
             // Load the hashes
             input_hash = jfh->loadHash(true, out_stream);
@@ -124,20 +115,39 @@ namespace kat
 
             if (args->verbose)
                 cerr << endl
-                     << "Hash loaded successfully." << endl
-                     << "Processing...";
+                     << "Hash loaded successfully." << endl;
 
             // Setup iterator for this thread's chunk of the hash
             hash_query_t::iterator hashIt = input_hash->iterator_all();
             size_t hash_size = input_hash->get_size();
             uint_t kmer_len = input_hash->get_mer_len();
             uint_t val_len = input_hash->get_val_len();
+            uint_t max_reprobe_index = 62; //input_hash->get_max_reprobe(); // Can't get it working this way! :s
+            uint_t nb_mers = input_hash->get_nb_mers();
+
+            if(args->verbose)
+            {
+                cerr << "Attempting to create output hash(es) with the following settings: " << endl
+                     << " mer length        = " << kmer_len << endl
+                     << " val length        = " << val_len << endl
+                     << " hash size         = " << hash_size << endl
+                     << " max reprobe index = " << max_reprobe_index << endl
+                     << " nb mers           = " << nb_mers << endl << endl;
+            }
 
             // Setup output hash, storage and dumper based on details from the input hash
-            inv_hash_storage_t storage(hash_size, 2*kmer_len, val_len, input_hash->get_max_reprobe(), jellyfish::quadratic_reprobes);
-            //hash_reader_t iter(db_file, args.out_buffer_size_arg);
+            inv_hash_storage_t storage1(hash_size, 2*kmer_len, val_len, max_reprobe_index, jellyfish::quadratic_reprobes);
+            jellyfish::compacted_hash::writer<inv_hash_storage_t> hash_writer1(nb_mers, 2*kmer_len, val_len, &storage1);
 
-            jellyfish::compacted_hash::writer<inv_hash_storage_t> hash_writer(input_hash->get_nb_mers(), kmer_len, val_len, &storage);
+            // Setup output hash, storage and dumper based on details from the input hash
+            inv_hash_storage_t storage2(hash_size, 2*kmer_len, val_len, max_reprobe_index, jellyfish::quadratic_reprobes);
+            jellyfish::compacted_hash::writer<inv_hash_storage_t> hash_writer2(nb_mers, 2*kmer_len, val_len, &storage2);
+
+            if(args->verbose)
+                cerr << "Successfully created writer and empty filtered hash.  Populating filtered hash...";
+
+            // Setup counters
+            Counter all_count, in_count, out_count;
 
             // Go through this thread's slice for hash
             while (hashIt.next())
@@ -145,39 +155,82 @@ namespace kat
                 string kmer = hashIt.get_dna_str();
                 uint64_t kmer_count = hashIt.get_val();
 
-                if(keepKmer(kmer, kmer_count))
-                {
-                    uint64_t kmer_binary = jellyfish::parse_dna::mer_string_to_binary(kmer.c_str(), kmer_len);
+                // Update stats
+                all_count.increment(kmer_count);
 
-                    hash_writer.append(kmer_binary, kmer_count);
+                bool in_bounds = inBounds(kmer, kmer_count);
+
+                in_bounds ? in_count.increment(kmer_count) : out_count.increment(kmer_count);
+
+                if (!args->separate)
+                {
+                    // Workout if we want to keep this kmer or not
+                    if((in_bounds && !args->invert) || (!in_bounds && args->invert))
+                    {
+                        hash_writer1.append(hashIt.get_key(), kmer_count);
+                    }
+                }
+                else
+                {
+                    // We are just separating the kmers so update whichever hash is appropriate
+                    if (in_bounds)
+                    {
+                        hash_writer1.append(hashIt.get_key(), kmer_count);
+                    }
+                    else
+                    {
+                        hash_writer2.append(hashIt.get_key(), kmer_count);
+                    }
                 }
             }
 
             if (args->verbose)
-                cerr << "done." << endl;
+            {
+                cerr << "done." << endl
+                     << "Writing filtered hash to: " << args->output << " ... ";
+            }
+
+            ostringstream out1_name_stream;
+            out1_name_stream << args->output << (args->separate ? ".in.jf" : "") << kmer_len << "_0";
+            string out_file_1 = out1_name_stream.str();
+
+            ostringstream out2_name_stream;
+            out2_name_stream << args->output << (args->separate ? ".out.jf" : "") << kmer_len << "_0";
+            string out_file_2 = out2_name_stream.str();
+
 
             // Output hash to file
-            ofstream_default hash_out_stream(args->output.c_str(), cout);
-            hash_writer.write_header(&hash_out_stream);
-            hash_writer.dump(&hash_out_stream);
+            ofstream_default hash_out_stream(out_file_1.c_str(), cout);
+            hash_writer1.write_header(&hash_out_stream);
+            hash_writer1.dump(&hash_out_stream);
             hash_out_stream.close();
 
+            if (args->separate)
+            {
+                // Output hash to file
+                ofstream_default hash_out_stream2(out_file_2.c_str(), cout);
+                hash_writer2.write_header(&hash_out_stream2);
+                hash_writer2.dump(&hash_out_stream2);
+                hash_out_stream2.close();
+            }
 
-            uint64_t nb_distinct = kmer_counters->nb_distinct;
-            uint64_t nb_kept = kmer_counters->nb_kept;
-            uint64_t nb_filtered = nb_distinct - nb_kept;
 
-            *out_stream << "# Distinct Kmers Processed : " << nb_distinct << endl
-                        << "# Discarded                : " << nb_filtered << endl
-                        << "# Kept                     : " << nb_kept << endl;
+            if (args->verbose)
+                cerr << "done." << endl;
 
+            *out_stream << "Distinct kmers in input      : " << all_count.distinct << endl
+                        << "Distinct kmers in bounds     : " << in_count.distinct << endl
+                        << "Distinct kmers out of bounds : " << out_count.distinct << endl
+                        << "Total kmers in input         : " << all_count.total << endl
+                        << "Total kmers in bounds        : " << in_count.total << endl
+                        << "Total kmers out of bounds    : " << out_count.total << endl;
         }
 
 
     private:
 
 
-        bool keepKmer(string& kmer_seq, uint64_t kmer_count)
+        bool inBounds(string& kmer_seq, uint64_t kmer_count)
         {
             // Calculate GC%
             uint32_t gc_count = kat::gcCount(kmer_seq);
@@ -185,15 +238,11 @@ namespace kat
             // Are we within the limits
             bool in_gc_limits = args->low_gc <= gc_count && gc_count <= args->high_gc;
 
-            // Check to see if we want to keep this sequence based on its GC content
-            if ((in_gc_limits && args->discard) || (!in_gc_limits && !args->discard))
-                return false;
-
             // Are we within the limits
             bool in_cvg_limits = args->low_count <= kmer_count && kmer_count <= args->high_count;
 
             // Return if we want to keep this sequence or not based on the coverage (and, if we've got this far, GC)
-            return (in_cvg_limits && !args->discard) || (!in_cvg_limits && args->discard);
+            return in_gc_limits && in_cvg_limits;
         }
 
     };

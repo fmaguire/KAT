@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include <jellyfish/hash.hpp>
+#include <jellyfish/mer_counting.hpp>
 
 using std::string;
 
@@ -31,5 +32,5 @@ namespace kat
 
     float calcGCPercentage(string& seq);
 
-    float calcMeanCoverage(string& seq, hash_t& hash);
+    float calcMeanCoverage(string& seq, hash_query_t& hash);
 }

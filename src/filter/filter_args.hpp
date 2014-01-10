@@ -34,8 +34,8 @@ using std::endl;
 
 namespace kat
 {
-    const string KAT_FILTER_KMER_ID        = "kmer";
-    const string KAT_FILTER_SEQ_ID         = "seq";
+    const string KAT_FILT_KMER_ID        = "kmer";
+    const string KAT_FILT_SEQ_ID         = "seq";
 
     const uint16_t MIN_ARGS = 0;
 
@@ -51,7 +51,7 @@ namespace kat
         // ***********************************************
         // These methods override BaseArgs virtual methods
 
-        const string usage() const               { return "Usage: kat filter <mode>"; }
+        const string usage() const               { return "Usage: kat filt <mode>"; }
         const string shortDescription() const    { return "Filtering tools"; }
         const string longDescription() const
         {
@@ -100,8 +100,8 @@ namespace kat
 
         bool validMode(string mode_str)
         {
-            return mode_str.compare(KAT_FILTER_KMER_ID) == 0 ||
-                   mode_str.compare(KAT_FILTER_SEQ_ID) == 0;
+            return mode_str.compare(KAT_FILT_KMER_ID) == 0 ||
+                   mode_str.compare(KAT_FILT_SEQ_ID) == 0;
         }
 
 
@@ -109,7 +109,7 @@ namespace kat
         {
             if (argc <= 1)
             {
-                error("No plot mode specified");
+                error("No filter mode specified");
             }
             else if (validMode(string(argv[1]))) {
 
@@ -122,7 +122,7 @@ namespace kat
                 // Let BaseArgs have a go, but make sure we fail after
                 parse(argc, argv);
 
-                error("Invalid command line arguments passed to \"kat plot\"");
+                error("Invalid command line arguments passed to \"kat filt\"");
                 exit(1);
             }
         }

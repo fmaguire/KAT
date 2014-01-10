@@ -41,11 +41,11 @@ int kat::filterStart(int argc, char *argv[])
     string mode = args.getMode();
 
     // Pass remaining args to relevant child tool
-    if (mode.compare(KAT_FILTER_KMER_ID) == 0)
+    if (mode.compare(KAT_FILT_KMER_ID) == 0)
     {
         kat::kmerFilterStart(args.getModeArgC(), args.getModeArgV());
     }
-    else if (mode.compare(KAT_FILTER_SEQ_ID) == 0)
+    else if (mode.compare(KAT_FILT_SEQ_ID) == 0)
     {
         kat::seqFilterStart(args.getModeArgC(), args.getModeArgV());
     }

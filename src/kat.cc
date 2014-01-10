@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     {
         kat::histStart(args.getModeArgC(), args.getModeArgV());
     }
-    else if (mode.compare(kat::KAT_REF_ID) == 0)
+    else if (mode.compare(kat::KAT_FILT_ID) == 0)
     {
         kat::filterStart(args.getModeArgC(), args.getModeArgV());
     }

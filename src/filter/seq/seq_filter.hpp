@@ -23,6 +23,7 @@
 #include <string.h>
 #include <iostream>
 #include <fstream>
+#include <cstdio>
 #include <vector>
 #include <math.h>
 
@@ -118,9 +119,9 @@ namespace kat
 
             uint32_t nb_records_filtered = counter.nb_records - counter.nb_kept;
 
-            cerr << "Processed : " << counter.nb_records << endl
-                 << "Filtered  : " << nb_records_filtered << endl
-                 << "Kept      : " << counter.nb_kept << endl;
+            *out_stream << "Processed : " << counter.nb_records << endl
+                       << "Filtered  : " << nb_records_filtered << endl
+                       << "Kept      : " << counter.nb_kept << endl;
         }
 
 
@@ -146,7 +147,7 @@ namespace kat
             append(out_path, getAutoSeqStreamFormatName(formatTag));
 
 
-            seqan::SequenceStream hash_out(
+            /*seqan::SequenceStream hash_out(
                                     toCString(out_path),
                                     seqan::SequenceStream::WRITE,
                                     seqan::SequenceStream::FASTQ,
@@ -156,8 +157,9 @@ namespace kat
                 stringstream ss;
                 ss << "ERROR: Could not open the output file: " << toCString(out_path) << endl;
                 throw ss.str();
-            }
+            }*/
 
+            FILE* hash_out = fopen(toCString(out_path), "w");
 
             uint64_t nb_records_read = 0;
             uint64_t nb_records_written = 0;
@@ -204,16 +206,19 @@ namespace kat
                 if (keep_seq)
                 {
                     //if (writeRecord(hash_out, id, seq, qual) != 0)
-                    /*if (writeRecord(hash_out, id, seq) != 0)
+                    //if (writeRecord(hash_out, id, seq, qual) != 0)
+                    if (writeFastQRecord(hash_out, toCString(id), seq.c_str(), toCString(qual)) != 0)
                     {
                         stringstream ss;
                         ss << "ERROR: Problem writing record to: " << endl;
                         throw ss.str();
-                    }*/
+                    }
 
                     nb_records_written++;
                 }
             }
+
+            fclose(hash_out);
 
             return SeqFilterCounter(nb_records_read, nb_records_written);
         }
@@ -262,7 +267,7 @@ namespace kat
             append(out_path_2, getAutoSeqStreamFormatName(formatTag2));
 
 
-            seqan::SequenceStream hash_out_1(
+            /*seqan::SequenceStream hash_out_1(
                                 toCString(out_path_1),
                                 seqan::SequenceStream::WRITE,
                                 seqan::SequenceStream::FASTQ,
@@ -284,7 +289,10 @@ namespace kat
                 stringstream ss;
                 ss << "ERROR: Could not open the output file: " << toCString(out_path_2) << endl;
                 throw ss.str();
-            }
+            }*/
+
+            FILE* hash_out_1 = fopen(toCString(out_path_1), "w");
+            FILE* hash_out_2 = fopen(toCString(out_path_2), "w");
 
 
             uint64_t nb_records_read = 0;
@@ -334,16 +342,16 @@ namespace kat
 
                 if (seq1_length < k)
                 {
-                    cerr << seq1 << " from R1 is too short to compute coverage.  Sequence length is "
-                         << seq1_length << " and K-mer length is " << k << ". Discarding sequence." << endl;
+                    //cerr << seq1 << " from R1 is too short to compute coverage.  Sequence length is "
+                    //     << seq1_length << " and K-mer length is " << k << ". Discarding sequence." << endl;
 
                     continue;
                 }
 
                 if (seq2_length < k)
                 {
-                    cerr << seq2 << " from R2 is too short to compute coverage.  Sequence length is "
-                         << seq2_length << " and K-mer length is " << k << ". Discarding sequence." << endl;
+                    //cerr << seq2 << " from R2 is too short to compute coverage.  Sequence length is "
+                    //    << seq2_length << " and K-mer length is " << k << ". Discarding sequence." << endl;
 
                     continue;
                 }
@@ -353,30 +361,41 @@ namespace kat
 
                 if (keep_seq)
                 {
+                    if (writeFastQRecord(hash_out_1, toCString(id1), seq1.c_str(), toCString(qual1)) != 0)
                     //if (writeRecord(hash_out_1, id1, seq1, qual1) != 0)
-                    /*if (writeRecord(hash_out_1, id1, seq1) != 0)
+                    //if (writeRecord(hash_out_1, id1, seq1) != 0)
                     {
                         stringstream ss;
                         ss << "ERROR: Problem writing record to: " << endl;
                         throw ss.str();
-                    }*/
+                    }
 
+                    if (writeFastQRecord(hash_out_2, toCString(id2), seq2.c_str(), toCString(qual2)) != 0)
                     //if (writeRecord(hash_out_2, id2, seq2, qual2) != 0)
-                    /*if (writeRecord(hash_out_2, id2, seq2) != 0)
+                    //if (writeRecord(hash_out_2, id2, seq2) != 0)
                     {
                         stringstream ss;
                         ss << "ERROR: Problem writing record from the provided sequence file." << endl;
                         throw ss.str();
-                    }*/
+                    }
 
                     nb_records_written++;
                 }
             }
 
+            fclose(hash_out_1);
+            fclose(hash_out_2);
+
             return SeqFilterCounter(nb_records_read, nb_records_written);
         }
 
+        // Hack because I can't figure out how to get SEQAN writeRecord to work properly for Fastq.
+        int writeFastQRecord(FILE* out, const char* id, const char* seq, const char* qual)
+        {
+            fprintf(out, "@%s\n%s\n+\n%s", id, seq, qual);
 
+            return 0;
+        }
 
 
         // There's no substring functionality in SeqAn in this version (1.4.1).  So we'll just
@@ -400,8 +419,8 @@ namespace kat
 
             if (seq_length < k)
             {
-                cerr << seq << " is too short to compute coverage.  Sequence length is "
-                     << seq_length << " and K-mer length is " << k << ". Discarding sequence." << endl;
+                //cerr << seq << " is too short to compute coverage.  Sequence length is "
+                //     << seq_length << " and K-mer length is " << k << ". Discarding sequence." << endl;
 
                 return false;
             }
