@@ -392,7 +392,7 @@ namespace kat
         // Hack because I can't figure out how to get SEQAN writeRecord to work properly for Fastq.
         int writeFastQRecord(FILE* out, const char* id, const char* seq, const char* qual)
         {
-            fprintf(out, "@%s\n%s\n+\n%s", id, seq, qual);
+            fprintf(out, "@%s\n%s\n+\n%s\n", id, seq, qual);
 
             return 0;
         }
