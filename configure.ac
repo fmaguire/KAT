@@ -3,11 +3,12 @@
 ##########################################################################
 
 # Autoconf initialistion.  Sets package name version and contact details
-AC_INIT([Kmer Analysis Toolkit (KAT)],[1.1.0.rc],[daniel.mapleson@tgac.ac.uk],[kat],[http://www.tgac.ac.uk])
 
-# I built this with autoconf 2.69 and have only tested it on 2.69 systems.  You can change this but I don't
+AC_INIT([Kmer Analysis Toolkit (KAT)],[1.1.0.rc],[bernardo.clavijo@tgac.ac.uk and/or daniel.mapleson@tgac.ac.uk],[kat],[http://www.tgac.ac.uk/kat])
+
+# I built this with autoconf 2.59 and have only tested it on 2.59, 2.63 and 2.69 systems.  You can change this but I don't
 # make any guarentees
-AC_PREREQ([2.63])
+AC_PREREQ([2.59])
 
 # Check that the configure script is being run from the right directory
 AC_CONFIG_SRCDIR([src/kat.cc])
@@ -94,7 +95,7 @@ DX_INIT_DOXYGEN([$PACKAGE_NAME],[doxygen.cfg])
 
 
 # Check some (almost) standard functionality is present that we require to run KAT.
-#AC_CHECK_HEADER_STDBOOL
+#AC_CHECK_HEADER_STDBOOL  # Commented this out because this was introduced after 2.63.
 AC_FUNC_ERROR_AT_LINE
 AC_TYPE_INT16_T
 AC_TYPE_INT32_T

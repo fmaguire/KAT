@@ -1,2 +1,3 @@
-/*.dirstamp
+/.dirstamp
 /kmer_filter_main.o
+/.deps/

@@ -72,6 +72,12 @@ string getDataFromList(string mx_path, string list)
     {
         char c_or_r = parts[i][0];
         uint16_t index = atoi(parts[i].substr(1).c_str());
+        ostringstream convert; convert << index; string index_str = convert.str();
+        
+        if (parts[i].substr(1).compare(index_str) != 0) {
+            throw "Your row or column index is not valid.";
+        }
+        
 
         if (c_or_r == 'c')
         {
@@ -89,7 +95,7 @@ string getDataFromList(string mx_path, string list)
         }
         else
         {
-            throw;
+            throw "Unrecognised list item identifier.  Expected 'c' or 'r'.";
         }
 
         data_str << "e\n";
@@ -216,7 +222,7 @@ int kat::spectraMxPlotStart(int argc, char *argv[])
     if (args.y_logscale)
         spectra_mx_plot.set_ylogscale();
 
-    spectra_mx_plot.cmd("set size ratio 1");
+    //spectra_mx_plot.cmd("set size ratio 1");
     spectra_mx_plot.cmd("set key font \",8\"");
     spectra_mx_plot.cmd("set xlabel offset \"0,1\" font \",10\"");
     spectra_mx_plot.cmd("set ylabel offset \"2,0\" font \",10\"");
@@ -236,7 +242,15 @@ int kat::spectraMxPlotStart(int argc, char *argv[])
         if (args.verbose)
             cerr << "Extracting requested data from matrix... " << endl;
 
-        data = getDataFromList(args.mx_path, args.list);
+        try
+        {
+            data = getDataFromList(args.mx_path, args.list);
+        }
+        catch(const char* msg)
+        {
+            cerr << "Error: " << msg << endl;
+            return 1;
+        }
 
         if (args.verbose)
             cerr << "done." << endl;
