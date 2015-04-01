@@ -97,6 +97,7 @@ DX_INIT_DOXYGEN([$PACKAGE_NAME],[doxygen.cfg])
 # Check some (almost) standard functionality is present that we require to run KAT.
 #AC_CHECK_HEADER_STDBOOL  # Commented this out because this was introduced after 2.63.
 AC_FUNC_ERROR_AT_LINE
+AC_FUNC_STRERROR_R
 AC_TYPE_INT16_T
 AC_TYPE_INT32_T
 AC_TYPE_INT64_T
@@ -119,7 +120,7 @@ AC_CHECK_HEADERS([getopt.h])
 
 
 # Check pthreads exists
-AC_CHECK_LIB(pthread, pthread_exit)
+AX_PTHREAD(, [AC_MSG_ERROR([pthreads lib not found.  Please ensure that pthreads is properly built and configured.])])
 
 
 # Allow users to specify custom directories for jellyfish, boost and seqan.  This might save some users from having to set the environment variables manually.
@@ -128,11 +129,6 @@ AC_ARG_WITH([jellyfish],
 	[AS_HELP_STRING([--with-jellyfish=PREFIX],
 		[Use this if your jellyfish installation prefix was set to a non-standard location.])],
         [JELLYFISH_PATH=$withval], [JELLYFISH_PATH=0])
-
-AC_ARG_WITH([seqan],
-        [AS_HELP_STRING([--with-seqan=PREFIX],
-		[Use this if your seqan installation prefix was set to a non-standard location.])],
-        [SEQAN_PATH=$withval], [SEQAN_PATH=0])
 
 AC_ARG_WITH([boost],
         [AS_HELP_STRING([--with-boost=PREFIX],
@@ -151,7 +147,7 @@ if test ${JELLYFISH_PATH} != 0; then
 fi
 
 # Jellyfish uses pkg-config so use this special macro to ensure that it's present and then we set the environment vars separately
-PKG_CHECK_MODULES([jellyfish], [jellyfish-1.1 = 1.1.10])
+PKG_CHECK_MODULES([jellyfish], [jellyfish-1.1 >= 1.1.10 jellyfish-1.1 <= 1.1.11])
 
 # Note that we are adding the jellyfish cflags to the cppflags var.  This is intentional!  Check the jellyfish package config file to see why. There is also some stuff on the jellyfish_LIBS var that should be on LDFLAGS but it will still work this way so I'll leave it
 AM_CPPFLAGS="$jellyfish_CFLAGS $AM_CPPFLAGS"
@@ -161,11 +157,6 @@ else
 	JELLYFISH_LIB="${jellyfish_LIBS}"
 fi
 
-
-# Update vars for seqan if required
-if test ${SEQAN_PATH} != 0; then
-    	AM_CPPFLAGS="-I${SEQAN_PATH}/include $AM_CPPFLAGS"
-fi
 
 # Update vars for boost if required (make sure this goes last as it's only to be used for testing)
 if test ${BOOST_PATH} != 0; then
@@ -189,25 +180,16 @@ CPPFLAGS="${AM_CPPFLAGS} ${CPPFLAGS}"
 # for generating source code documentation.
 
 AC_CHECK_HEADER([jellyfish/hash.hpp], [], [
-         echo "Jellyfish is required to compile and run KAT.  Please make sure jellyfish-1.1.10 is installed on your system."
+         echo "Jellyfish is required to compile and run KAT.  Please make sure jellyfish-1.1.11 is installed on your system."
          echo "You can optionally use the \"--with-jellyfish=prefix\" argument to specify the root directory of your jellyfish installation."
          exit -1],
 	[])
 
-
-AC_CHECK_HEADER([seqan/sequence.h], [], [
-         echo "Seqan is required to compile and run KAT.  Please make sure seqan is installed on your system."
-         echo "If seqan is installed but the headers are not currently available through the CPPFLAGS environment"
-         echo "variable then please re-run \"./configure\".  You can optionally use the \"--with-seqan=prefix\" argument"
-         echo "to specify the root directory of your seqan installation."
-         exit -1],
-         [])
-
 # Restore the previous CPPFLAGS
 CPPFLAGS=$OLD_CPPFLAGS
 
-MAIN_LIBS="${JELLYFISH_LIB} ${LIBS}"
-TEST_LIBS="${BOOST_LIB} ${JELLYFISH_LIB} ${LIBS}"
+MAIN_LIBS="${PTHREAD_CFLAGS} ${JELLYFISH_LIB} ${LIBS}"
+TEST_LIBS="${BOOST_LIB} ${PTHREAD_CFLAGS} ${JELLYFISH_LIB} ${LIBS}"
 
 AC_SUBST([AM_CPPFLAGS])
 AC_SUBST([AM_CXXFLAGS])
