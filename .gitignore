@@ -40,3 +40,12 @@ Makefile.in
 /.deps/
 /.libs/
 *.hpp
+!/src/filter/kmer/kmer_filter.hpp
+!/src/filter/kmer/kmer_filter_args.hpp
+!/src/filter/filter_main.hpp
+!/src/filter/seq/seq_filter_args.hpp
+!/src/filter/seq/seq_filter.hpp
+!/src/filter/filter_args.hpp
+!/src/filter/seq/seq_filter_main.hpp
+!/src/filter/kmer/kmer_filter_main.hpp
+!/src/filter/common_filter_args.hpp
